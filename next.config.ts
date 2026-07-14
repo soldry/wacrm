@@ -64,6 +64,11 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // Required for the production Docker image (EasyPanel / any VPS).
+  // `next start` still works locally; the image runs `node server.js`
+  // from `.next/standalone`.
+  output: "standalone",
+
   /**
    * Cache-Control policy.
    *
