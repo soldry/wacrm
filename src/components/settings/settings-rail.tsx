@@ -35,15 +35,22 @@ export function SettingsRail({
   const activeRef = useRef<HTMLButtonElement>(null);
 
   // When horizontal (mobile), keep the active chip in view. On desktop
-  // the rail is a static column, so skip.
+  // the rail is a static column, so skip. Deferred to rAF so we don't
+  // touch the DOM mid-commit (avoids removeChild races with React 19).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.matchMedia(`(min-width: ${RAIL_DESKTOP_MIN_PX}px)`).matches) return;
-    activeRef.current?.scrollIntoView({
-      inline: 'center',
-      block: 'nearest',
-      behavior: 'smooth',
+    const el = activeRef.current;
+    if (!el) return;
+    const id = window.requestAnimationFrame(() => {
+      if (!el.isConnected) return;
+      el.scrollIntoView({
+        inline: 'center',
+        block: 'nearest',
+        behavior: 'smooth',
+      });
     });
+    return () => window.cancelAnimationFrame(id);
   }, [active]);
 
   return (

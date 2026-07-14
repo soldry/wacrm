@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { NextIntlClientProvider } from 'next-intl';
+import { IntlErrorCode, NextIntlClientProvider } from 'next-intl';
+import type { IntlError } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { Inter } from "next/font/google";
 import Script from "next/script";
@@ -14,6 +15,21 @@ import {
   STORAGE_KEY,
   THEME_IDS,
 } from "@/lib/themes";
+
+/**
+ * Soft-handle missing i18n keys so a forgotten translation never crashes
+ * the React tree. (A hard throw during render often surfaces as a cryptic
+ * `removeChild` NotFoundError once React recovers the DOM.)
+ */
+function handleIntlError(error: IntlError) {
+  if (error.code === IntlErrorCode.MISSING_MESSAGE) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(error.message);
+    }
+    return;
+  }
+  console.error(error);
+}
 
 const inter = Inter({
   variable: "--font-sans",
@@ -88,9 +104,15 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
+      // Chrome (and other) auto-translate rewrites text nodes under
+      // React's control; when Next.js then updates the route announcer
+      // or unmounts a tree, you get
+      // `NotFoundError: Failed to execute 'removeChild'…`. Keep the app
+      // unmarked for translation — we ship our own i18n.
+      translate="no"
       data-theme={DEFAULT_THEME}
       data-mode={DEFAULT_MODE}
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased notranslate`}
       // The `theme-boot` script below rewrites `data-theme` and
       // `data-mode` on <html> from localStorage before React hydrates,
       // so for any non-default choice the client DOM intentionally
@@ -101,6 +123,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <meta name="google" content="notranslate" />
         <Script
           id="theme-boot"
           strategy="beforeInteractive"
@@ -108,7 +131,12 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans">
-        <NextIntlClientProvider messages={messages} locale={locale}>
+        <NextIntlClientProvider
+          messages={messages}
+          locale={locale}
+          onError={handleIntlError}
+          getMessageFallback={({ key }) => key}
+        >
           <ThemeProvider>
             {children}
             <ThemedToaster />
