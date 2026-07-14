@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { IntlErrorCode, NextIntlClientProvider } from 'next-intl';
-import type { IntlError } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { AppIntlProvider } from "@/components/app-intl-provider";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemedToaster } from "@/components/themed-toaster";
 import {
@@ -15,21 +14,6 @@ import {
   STORAGE_KEY,
   THEME_IDS,
 } from "@/lib/themes";
-
-/**
- * Soft-handle missing i18n keys so a forgotten translation never crashes
- * the React tree. (A hard throw during render often surfaces as a cryptic
- * `removeChild` NotFoundError once React recovers the DOM.)
- */
-function handleIntlError(error: IntlError) {
-  if (error.code === IntlErrorCode.MISSING_MESSAGE) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(error.message);
-    }
-    return;
-  }
-  console.error(error);
-}
 
 const inter = Inter({
   variable: "--font-sans",
@@ -131,17 +115,12 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans">
-        <NextIntlClientProvider
-          messages={messages}
-          locale={locale}
-          onError={handleIntlError}
-          getMessageFallback={({ key }) => key}
-        >
+        <AppIntlProvider locale={locale} messages={messages}>
           <ThemeProvider>
             {children}
             <ThemedToaster />
           </ThemeProvider>
-        </NextIntlClientProvider>
+        </AppIntlProvider>
       </body>
     </html>
   );
